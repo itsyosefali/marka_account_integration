@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import now, flt, cstr
+from frappe.frappeclient import FrappeClient
 
 
 def create_customer_if_not_exists(customer_name):
@@ -377,3 +378,55 @@ def delete_payment_entry(name):
             "status": "error",
             "message": str(e)
         }
+
+
+@frappe.whitelist()
+def login_and_open_general_ledger(company=None, from_date=None, to_date=None, account=None):
+
+    try:
+        settings = frappe.get_doc(
+            "Merka Account Settings", "Merka Account Settings",
+        )
+        username = settings.user_email
+        password = settings.user_password
+        site_url = frappe.utils.get_url()
+        
+        if not frappe.db.exists("User", username):
+            frappe.throw(f"User {username} does not exist in the system")
+        
+        if not username:
+            frappe.throw("User email not found in Merka Account Settings")
+        if not password:
+                frappe.throw("User password not found in Merka Account Settings")
+        
+        
+        client = FrappeClient(url=site_url, username=username, password=password, verify=True)
+        
+        sid = client.session.cookies.get('sid')
+        
+        if not sid:
+            frappe.throw("Failed to get session ID. Please check credentials.")
+        
+        report_url = f"{site_url}/app/query-report/General%20Ledger"
+        
+        params = []
+        if company:
+            params.append(f"company={company}")
+        if from_date:
+            params.append(f"from_date={from_date}")
+        if to_date:
+            params.append(f"to_date={to_date}")
+        if account:
+            params.append(f"account={account}")
+        
+        if params:
+            report_url += "?" + "&".join(params)
+        
+        report_url += f"&sid={sid}" if "?" in report_url else f"?sid={sid}"
+        
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = report_url
+        frappe.local.response["http_status_code"] = 302
+        
+    except Exception as e:
+        frappe.throw(f"Failed to login and redirect to General Ledger: {str(e)}")
