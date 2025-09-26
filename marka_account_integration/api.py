@@ -380,10 +380,60 @@ def delete_payment_entry(name):
         }
 
 
+# Report mapping for different report types
+REPORT_MAPPING = {
+    "general_ledger": "General Ledger",
+    "profit_loss": "Profit and Loss Statement", 
+    "cash_flow": "Cash Flow",
+    "payables": "Accounts Payable",
+    "receivables": "Accounts Receivable",
+    "payables_summary": "Payables Summary",
+    "receivables_summary": "Receivables Summary",
+    "trial_balance": "Trial Balance",
+    "balance_sheet": "Balance Sheet",
+    "vat_report": "VAT Report"
+}
+
 @frappe.whitelist()
 def login_and_open_general_ledger(company=None, from_date=None, to_date=None, account=None):
+    """Legacy function - redirects to the new general report function"""
+    return open_report(
+        report_type="general_ledger",
+        company=company,
+        from_date=from_date,
+        to_date=to_date,
+        account=account
+    )
 
+@frappe.whitelist()
+def open_report(report_type, company=None, from_date=None, to_date=None, account=None, **kwargs):
+    """
+    General endpoint to open any of the specified reports
+    
+    Args:
+        report_type (str): Type of report to open. Options:
+            - general_ledger: General Ledger
+            - profit_loss: Gross Profit and Loss Account
+            - cash_flow: Cash Flow
+            - payables: Report Payables
+            - receivables: Report Receivables
+            - payables_summary: Report Payables Summary
+            - receivables_summary: Report Receivables Summary
+            - trial_balance: Trial Balance
+            - balance_sheet: Balance Sheet
+            - vat_report: VAT Report
+        company (str, optional): Company filter
+        from_date (str, optional): From date filter
+        to_date (str, optional): To date filter
+        account (str, optional): Account filter
+        **kwargs: Additional parameters for specific reports
+    """
     try:
+        # Validate report type
+        if report_type not in REPORT_MAPPING:
+            available_reports = ", ".join(REPORT_MAPPING.keys())
+            frappe.throw(f"Invalid report type '{report_type}'. Available options: {available_reports}")
+        
         settings = frappe.get_doc(
             "Merka Account Settings", "Merka Account Settings",
         )
@@ -397,8 +447,7 @@ def login_and_open_general_ledger(company=None, from_date=None, to_date=None, ac
         if not username:
             frappe.throw("User email not found in Merka Account Settings")
         if not password:
-                frappe.throw("User password not found in Merka Account Settings")
-        
+            frappe.throw("User password not found in Merka Account Settings")
         
         client = FrappeClient(url=site_url, username=username, password=password, verify=True)
         
@@ -407,8 +456,21 @@ def login_and_open_general_ledger(company=None, from_date=None, to_date=None, ac
         if not sid:
             frappe.throw("Failed to get session ID. Please check credentials.")
         
-        report_url = f"{site_url}/app/query-report/General%20Ledger"
+        # Get the report name from mapping
+        report_name = REPORT_MAPPING[report_type]
         
+        # Determine the correct URL path based on report type
+        if report_type in ["general_ledger", "profit_loss", "trial_balance", "balance_sheet"]:
+            # Query reports
+            report_url = f"{site_url}/app/query-report/{report_name.replace(' ', '%20')}"
+        elif report_type in ["cash_flow", "payables", "receivables", "payables_summary", "receivables_summary", "vat_report"]:
+            # Script reports
+            report_url = f"{site_url}/app/script-report/{report_name.replace(' ', '%20')}"
+        else:
+            # Default to query report
+            report_url = f"{site_url}/app/query-report/{report_name.replace(' ', '%20')}"
+        
+        # Build parameters
         params = []
         if company:
             params.append(f"company={company}")
@@ -419,14 +481,89 @@ def login_and_open_general_ledger(company=None, from_date=None, to_date=None, ac
         if account:
             params.append(f"account={account}")
         
+        # Add any additional parameters
+        for key, value in kwargs.items():
+            if value is not None:
+                params.append(f"{key}={value}")
+        
+        # Add session ID
+        params.append(f"sid={sid}")
+        
         if params:
             report_url += "?" + "&".join(params)
-        
-        report_url += f"&sid={sid}" if "?" in report_url else f"?sid={sid}"
         
         frappe.local.response["type"] = "redirect"
         frappe.local.response["location"] = report_url
         frappe.local.response["http_status_code"] = 302
         
+        return {
+            "status": "success",
+            "message": f"Redirecting to {report_name}",
+            "report_type": report_type,
+            "report_name": report_name,
+            "url": report_url
+        }
+        
     except Exception as e:
-        frappe.throw(f"Failed to login and redirect to General Ledger: {str(e)}")
+        frappe.throw(f"Failed to login and redirect to {report_type}: {str(e)}")
+
+@frappe.whitelist()
+def get_available_reports():
+    """
+    Get list of available reports with their descriptions
+    """
+    return {
+        "status": "success",
+        "reports": [
+            {
+                "type": "general_ledger",
+                "name": "General Ledger",
+                "description": "General Ledger report showing all account transactions"
+            },
+            {
+                "type": "profit_loss", 
+                "name": "Profit and Loss Statement",
+                "description": "Gross Profit and Loss Account report"
+            },
+            {
+                "type": "cash_flow",
+                "name": "Cash Flow",
+                "description": "Cash flow statement report"
+            },
+            {
+                "type": "payables",
+                "name": "Accounts Payable", 
+                "description": "Report showing outstanding payables"
+            },
+            {
+                "type": "receivables",
+                "name": "Accounts Receivable",
+                "description": "Report showing outstanding receivables"
+            },
+            {
+                "type": "payables_summary",
+                "name": "Payables Summary",
+                "description": "Summary report of all payables"
+            },
+            {
+                "type": "receivables_summary", 
+                "name": "Receivables Summary",
+                "description": "Summary report of all receivables"
+            },
+            {
+                "type": "trial_balance",
+                "name": "Trial Balance",
+                "description": "Trial balance report"
+            },
+            {
+                "type": "balance_sheet",
+                "name": "Balance Sheet", 
+                "description": "Balance sheet report"
+            },
+            {
+                "type": "vat_report",
+                "name": "VAT Report",
+                "description": "VAT report for tax compliance"
+            }
+        ]
+    }
