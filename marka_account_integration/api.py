@@ -3,7 +3,7 @@ from frappe import _
 from frappe.utils import now, flt, cstr
 from frappe.frappeclient import FrappeClient
 
-
+@frappe.whitelist()
 def create_customer_if_not_exists(customer_name):
     """Create customer if it doesn't exist"""
     if not frappe.db.exists("Customer", customer_name):
