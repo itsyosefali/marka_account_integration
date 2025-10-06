@@ -67,6 +67,15 @@ def create_sales_invoice(customer, items, posting_date=None, due_date=None, **kw
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
         
+        # Add 5% VAT
+        doc.append("taxes", {
+            "charge_type": "On Net Total",
+            "account_head": "VAT 5% - M",
+            "description": "VAT 5%",
+            "rate": 5.0,
+            "tax_amount": 0
+        })
+        
         for key, value in kwargs.items():
             if hasattr(doc, key):
                 setattr(doc, key, value)
@@ -174,6 +183,15 @@ def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, *
                 "rate": item.get("rate", 0),
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
+        
+        # Add 5% VAT
+        doc.append("taxes", {
+            "charge_type": "On Net Total",
+            "account_head": "VAT - LYD",
+            "description": "VAT 5%",
+            "rate": 5.0,
+            "tax_amount": 0
+        })
         
         for key, value in kwargs.items():
             if hasattr(doc, key):
