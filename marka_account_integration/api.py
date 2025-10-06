@@ -43,7 +43,7 @@ def create_item_if_not_exists(item_code, item_name=None, item_group="All Item Gr
 
 # Sales Invoice CRUD
 @frappe.whitelist()
-def create_sales_invoice(customer, items, posting_date=None, due_date=None, **kwargs):
+def create_sales_invoice(customer, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, **kwargs):
     """Create a new Sales Invoice"""
     try:
         customer = create_customer_if_not_exists(customer)
@@ -67,14 +67,14 @@ def create_sales_invoice(customer, items, posting_date=None, due_date=None, **kw
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
         
-        # Add 5% VAT
-        doc.append("taxes", {
-            "charge_type": "On Net Total",
-            "account_head": "VAT 5% - M",
-            "description": "VAT 5%",
-            "rate": 5.0,
-            "tax_amount": 0
-        })
+        if vat_rate is not None:
+            doc.append("taxes", {
+                "charge_type": "On Net Total",
+                "account_head": vat_account_head or "VAT 5% - M",
+                "description": vat_description or "VAT",
+                "rate": flt(vat_rate),
+                "tax_amount": 0
+            })
         
         for key, value in kwargs.items():
             if hasattr(doc, key):
@@ -160,7 +160,7 @@ def delete_sales_invoice(name):
 
 # Purchase Invoice CRUD
 @frappe.whitelist()
-def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, **kwargs):
+def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, **kwargs):
     """Create a new Purchase Invoice"""
     try:
         supplier = create_supplier_if_not_exists(supplier)
@@ -184,14 +184,15 @@ def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, *
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
         
-        # Add 5% VAT
-        doc.append("taxes", {
-            "charge_type": "On Net Total",
-            "account_head": "VAT - LYD",
-            "description": "VAT 5%",
-            "rate": 5.0,
-            "tax_amount": 0
-        })
+        # Add VAT if provided
+        if vat_rate is not None:
+            doc.append("taxes", {
+                "charge_type": "On Net Total",
+                "account_head": vat_account_head or "VAT - LYD",
+                "description": vat_description or "VAT",
+                "rate": flt(vat_rate),
+                "tax_amount": 0
+            })
         
         for key, value in kwargs.items():
             if hasattr(doc, key):
