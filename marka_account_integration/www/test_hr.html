@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Module Test - Marka Integration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976D2;
+            font-size: 16px;
+        }
+        .info-box p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+        }
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            animation: slideIn 0.3s ease-in;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .divider {
+            border-top: 2px solid #eee;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏢 HR Module Access</h1>
+        <p class="subtitle">Marka Account Integration Test Page</p>
+        
+        <div class="info-box">
+            <h3>📋 About This Test</h3>
+            <p><strong>Purpose:</strong> Test the HR module access with HR credentials</p>
+            <p><strong>Method:</strong> open_hr_module</p>
+            <p><strong>Authentication:</strong> Uses HR email and password from Merka Account Settings</p>
+            <p><strong>Destination:</strong> /app/hr</p>
+        </div>
+        
+        <div class="btn-container">
+            <button id="openHRBtn" onclick="openHRModule()">
+                🚀 Open HR Module
+            </button>
+            
+            <button class="btn-secondary" onclick="window.location.href='/test'">
+                📊 Test Reports Module
+            </button>
+        </div>
+        
+        <div id="response" class="response"></div>
+        
+        <div class="divider"></div>
+        
+        <div class="info-box" style="background-color: #fff3cd; border-left-color: #ffc107;">
+            <h3>⚙️ Configuration Required</h3>
+            <p>Make sure you have configured the following in <strong>Merka Account Settings</strong>:</p>
+            <p>• HR Email</p>
+            <p>• HR Password</p>
+            <p>• Valid HR user must exist in the system</p>
+        </div>
+    </div>
+
+    <script>
+        async function openHRModule() {
+            const btn = document.getElementById('openHRBtn');
+            const responseDiv = document.getElementById('response');
+            
+            // Disable button and show loading
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = 'Opening HR Module<span class="loading"></span>';
+            responseDiv.style.display = 'none';
+            
+            try {
+                // Make request to the API endpoint
+                const response = await fetch('/api/method/marka_account_integration.api.open_hr_module', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.message) {
+                    if (data.message.status === 'success') {
+                        responseDiv.className = 'response success';
+                        responseDiv.innerHTML = '<strong>✅ Success!</strong> ' + data.message.message;
+                        responseDiv.style.display = 'block';
+                        
+                        // Redirect to the HR module
+                        if (data.message.url) {
+                            setTimeout(() => {
+                                window.location.href = data.message.url;
+                            }, 1000);
+                        }
+                    } else {
+                        responseDiv.className = 'response error';
+                        responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + (data.message.message || 'Failed to open HR module');
+                        responseDiv.style.display = 'block';
+                    }
+                } else {
+                    // Handle error response
+                    let errorMessage = 'Request failed';
+                    
+                    if (data.exception) {
+                        // Extract the error message from Frappe's error format
+                        const match = data.exception.match(/(?:Error:|Exception:)\s*(.+?)(?:\n|$)/);
+                        if (match) {
+                            errorMessage = match[1];
+                        } else {
+                            errorMessage = data.exception.split('\n')[0];
+                        }
+                    } else if (data._server_messages) {
+                        try {
+                            const messages = JSON.parse(data._server_messages);
+                            const firstMsg = JSON.parse(messages[0]);
+                            errorMessage = firstMsg.message || errorMessage;
+                        } catch (e) {
+                            errorMessage = data._server_messages;
+                        }
+                    }
+                    
+                    responseDiv.className = 'response error';
+                    responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + errorMessage;
+                    responseDiv.style.display = 'block';
+                }
+                
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + error.message;
+                responseDiv.style.display = 'block';
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+        
+        // Add keyboard shortcut (Ctrl+Enter) to open HR module
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                openHRModule();
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -188,7 +188,7 @@ def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, v
         if vat_rate is not None:
             doc.append("taxes", {
                 "charge_type": "On Net Total",
-                "account_head": vat_account_head or "VAT - LYD",
+                "account_head": vat_account_head or "VAT - UAE",
                 "description": vat_description or "VAT",
                 "rate": flt(vat_rate),
                 "tax_amount": 0
@@ -796,3 +796,54 @@ def get_available_reports():
             }
         ]
     }
+
+
+@frappe.whitelist()
+def open_hr_module():
+    """
+    Opens the HR module (app/hr) using HR user credentials from Merka Account Settings
+    """
+    try:
+        # Get HR credentials from settings
+        settings = frappe.get_doc(
+            "Merka Account Settings", "Merka Account Settings",
+        )
+        hr_email = settings.hr_email
+        hr_password = settings.hr_password
+        site_url = frappe.utils.get_url()
+        
+        # Validate HR credentials
+        if not hr_email:
+            frappe.throw("HR email not found in Merka Account Settings")
+        if not hr_password:
+            frappe.throw("HR password not found in Merka Account Settings")
+        
+        # Validate user exists
+        if not frappe.db.exists("User", hr_email):
+            frappe.throw(f"User {hr_email} does not exist in the system")
+        
+        # Login using FrappeClient
+        client = FrappeClient(url=site_url, username=hr_email, password=hr_password, verify=True)
+        
+        # Get session ID
+        sid = client.session.cookies.get('sid')
+        
+        if not sid:
+            frappe.throw("Failed to get session ID. Please check HR credentials.")
+        
+        # Build HR module URL
+        hr_url = f"{site_url}/app/hr?sid={sid}"
+        
+        # Set redirect response
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = hr_url
+        frappe.local.response["http_status_code"] = 302
+        
+        return {
+            "status": "success",
+            "message": "Redirecting to HR module",
+            "url": hr_url
+        }
+        
+    except Exception as e:
+        frappe.throw(f"Failed to open HR module: {str(e)}")

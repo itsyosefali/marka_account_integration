@@ -7,7 +7,10 @@
  "field_order": [
   "logged_in_user_section",
   "user_email",
-  "user_password"
+  "user_password",
+  "hr_user_section",
+  "hr_email",
+  "hr_password"
  ],
  "fields": [
   {
@@ -24,13 +27,28 @@
    "fieldname": "user_password",
    "fieldtype": "Data",
    "label": "User Password"
+  },
+  {
+   "fieldname": "hr_user_section",
+   "fieldtype": "Section Break",
+   "label": "HR User "
+  },
+  {
+   "fieldname": "hr_email",
+   "fieldtype": "Data",
+   "label": "HR Email"
+  },
+  {
+   "fieldname": "hr_password",
+   "fieldtype": "Data",
+   "label": "HR Password"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-09-25 15:41:04.509940",
+ "modified": "2025-10-11 14:50:10.387172",
  "modified_by": "Administrator",
  "module": "Marka Account Integration",
  "name": "Merka Account Settings",
