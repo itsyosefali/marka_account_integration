@@ -181,59 +181,44 @@
             responseDiv.style.display = 'none';
             
             try {
-                // Make request to the API endpoint
+                // Make request to the API endpoint (same pattern as test.html)
                 const response = await fetch('/api/method/marka_account_integration.api.open_hr_module', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    credentials: 'include'
+                    credentials: 'include',
+                    body: ''
                 });
                 
-                const data = await response.json();
-                
-                if (response.ok && data.message) {
-                    if (data.message.status === 'success') {
+                if (response.ok) {
+                    // If it's a redirect response, handle it
+                    if (response.redirected) {
                         responseDiv.className = 'response success';
-                        responseDiv.innerHTML = '<strong>✅ Success!</strong> ' + data.message.message;
+                        responseDiv.innerHTML = '<strong>✅ Success!</strong> Redirecting to HR module...';
                         responseDiv.style.display = 'block';
                         
-                        // Redirect to the HR module
-                        if (data.message.url) {
+                        // Redirect to HR module
+                        setTimeout(() => {
+                            window.location.href = response.url;
+                        }, 500);
+                    } else {
+                        const data = await response.json();
+                        responseDiv.className = 'response success';
+                        responseDiv.innerHTML = '<strong>✅ Success!</strong> ' + (data.message || 'Request completed successfully');
+                        responseDiv.style.display = 'block';
+                        
+                        // If there's a URL in the response, redirect
+                        if (data.message && data.message.url) {
                             setTimeout(() => {
                                 window.location.href = data.message.url;
                             }, 1000);
                         }
-                    } else {
-                        responseDiv.className = 'response error';
-                        responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + (data.message.message || 'Failed to open HR module');
-                        responseDiv.style.display = 'block';
                     }
                 } else {
-                    // Handle error response
-                    let errorMessage = 'Request failed';
-                    
-                    if (data.exception) {
-                        // Extract the error message from Frappe's error format
-                        const match = data.exception.match(/(?:Error:|Exception:)\s*(.+?)(?:\n|$)/);
-                        if (match) {
-                            errorMessage = match[1];
-                        } else {
-                            errorMessage = data.exception.split('\n')[0];
-                        }
-                    } else if (data._server_messages) {
-                        try {
-                            const messages = JSON.parse(data._server_messages);
-                            const firstMsg = JSON.parse(messages[0]);
-                            errorMessage = firstMsg.message || errorMessage;
-                        } catch (e) {
-                            errorMessage = data._server_messages;
-                        }
-                    }
-                    
+                    const errorData = await response.json();
                     responseDiv.className = 'response error';
-                    responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + errorMessage;
+                    responseDiv.innerHTML = '<strong>❌ Error:</strong> ' + (errorData.message || 'Request failed');
                     responseDiv.style.display = 'block';
                 }
                 

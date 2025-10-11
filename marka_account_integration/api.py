@@ -798,7 +798,7 @@ def get_available_reports():
     }
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def open_hr_module():
     """
     Opens the HR module (app/hr) using HR user credentials from Merka Account Settings
