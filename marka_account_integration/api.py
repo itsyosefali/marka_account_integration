@@ -1,7 +1,11 @@
 import frappe
 from frappe import _
-from frappe.utils import now, flt, cstr
+from frappe.utils import now, flt, cstr, nowdate, getdate
 from frappe.frappeclient import FrappeClient
+from erpnext.accounts.party import get_party_account
+from erpnext.accounts.utils import get_account_currency
+from erpnext.setup.utils import get_exchange_rate
+import erpnext
 
 @frappe.whitelist()
 def create_customer_if_not_exists(customer_name):
@@ -282,50 +286,256 @@ def delete_purchase_invoice(name):
 
 # Payment Entry CRUD
 @frappe.whitelist()
-def create_payment_entry(party_type, party, paid_amount, paid_from=None, paid_to=None, references=None, **kwargs):
-    """Create a new Payment Entry"""
+def create_payment_entry(party_type, party, paid_amount, mode_of_payment=None, company=None, 
+                        posting_date=None, reference_no=None, reference_date=None, 
+                        references=None, cost_center=None, remarks=None, submit=False, **kwargs):
+    """
+    Create a new Payment Entry using ERPNext's utilities
+    
+    Args:
+        party_type (str): "Customer" or "Supplier"
+        party (str): Party name
+        paid_amount (float): Amount to pay/receive
+        mode_of_payment (str, optional): Mode of payment (required for bank account lookup)
+        company (str, optional): Company name (defaults to default company)
+        posting_date (str, optional): Posting date (defaults to today)
+        reference_no (str, optional): Reference number
+        reference_date (str, optional): Reference date
+        references (list, optional): List of reference documents to allocate against
+        cost_center (str, optional): Cost center
+        remarks (str, optional): Remarks/notes
+        submit (bool, optional): Whether to submit the payment entry (default: False)
+        **kwargs: Additional fields to set on the payment entry
+    """
     try:
         if party_type == "Customer":
             party = create_customer_if_not_exists(party)
         elif party_type == "Supplier":
             party = create_supplier_if_not_exists(party)
         
-        doc = frappe.new_doc("Payment Entry")
-        doc.payment_type = "Receive" if party_type == "Customer" else "Pay"
-        doc.party_type = party_type
-        doc.party = party
-        doc.paid_amount = flt(paid_amount)
-        doc.received_amount = flt(paid_amount)
-        doc.posting_date = now()
+        if not company:
+            company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
         
-        if paid_from:
-            doc.paid_from = paid_from
-        if paid_to:
-            doc.paid_to = paid_to
+        if not company:
+            frappe.throw(_("Company is required"))
         
-        # Add payment references
+        posting_date = posting_date or nowdate()
+        reference_date = getdate(reference_date) if reference_date else getdate(posting_date)
+        
+        payment_type = "Receive" if party_type == "Customer" else "Pay"
+        
+        party_account = get_party_account(party_type, party, company)
+        party_account_currency = get_account_currency(party_account)
+        
+        bank_account = None
+        bank_account_currency = None
+        
+        if mode_of_payment:
+            bank_account = frappe.db.get_value(
+                "Mode of Payment Account",
+                {"parent": mode_of_payment, "company": company},
+                "default_account"
+            )
+        
+        if not bank_account:
+            bank_account = frappe.db.get_value(
+                "Account",
+                {"company": company, "account_type": "Cash", "is_group": 0},
+                "name"
+            )
+            
+        if not bank_account:
+            bank_account = frappe.db.get_value(
+                "Account",
+                {"company": company, "account_type": "Bank", "is_group": 0},
+                "name"
+            )
+        
+        if not bank_account:
+            frappe.throw(_("Please specify mode_of_payment or ensure a default Cash/Bank account exists for company {0}").format(company))
+        
+        bank_account_currency = get_account_currency(bank_account)
+        
+        company_currency = frappe.get_cached_value("Company", company, "default_currency")
+        
+        source_exchange_rate = 1.0
+        target_exchange_rate = 1.0
+        
+        if payment_type == "Receive":
+            paid_from_currency = party_account_currency
+            paid_to_currency = bank_account_currency
+            
+            if party_account_currency != company_currency:
+                source_exchange_rate = get_exchange_rate(party_account_currency, company_currency, posting_date)
+            if bank_account_currency != company_currency:
+                target_exchange_rate = get_exchange_rate(bank_account_currency, company_currency, posting_date)
+                
+        else: 
+            paid_from_currency = bank_account_currency
+            paid_to_currency = party_account_currency
+            
+            if bank_account_currency != company_currency:
+                source_exchange_rate = get_exchange_rate(bank_account_currency, company_currency, posting_date)
+            if party_account_currency != company_currency:
+                target_exchange_rate = get_exchange_rate(party_account_currency, company_currency, posting_date)
+
+        pe = frappe.new_doc("Payment Entry")
+        pe.payment_type = payment_type
+        pe.company = company
+        pe.posting_date = posting_date
+        pe.reference_date = reference_date
+        pe.mode_of_payment = mode_of_payment
+        pe.party_type = party_type
+        pe.party = party
+        pe.cost_center = cost_center or erpnext.get_default_cost_center(company)
+        
+        if payment_type == "Receive":
+            pe.paid_from = party_account
+            pe.paid_to = bank_account
+            pe.paid_from_account_currency = party_account_currency
+            pe.paid_to_account_currency = bank_account_currency
+        else:  # Pay
+            pe.paid_from = bank_account
+            pe.paid_to = party_account
+            pe.paid_from_account_currency = bank_account_currency
+            pe.paid_to_account_currency = party_account_currency
+        
+        pe.source_exchange_rate = source_exchange_rate
+        pe.target_exchange_rate = target_exchange_rate
+        
+        pe.paid_amount = flt(paid_amount)
+        pe.received_amount = flt(paid_amount)
+        
+        if reference_no:
+            pe.reference_no = reference_no
+        if remarks:
+            pe.remarks = remarks
+        
         if references:
             for ref in references:
-                doc.append("references", {
+                pe.append("references", {
                     "reference_doctype": ref.get("reference_doctype"),
                     "reference_name": ref.get("reference_name"),
-                    "allocated_amount": ref.get("allocated_amount", 0),
-                    "outstanding_amount": ref.get("outstanding_amount", 0)
+                    "allocated_amount": flt(ref.get("allocated_amount", 0)),
+                    "outstanding_amount": flt(ref.get("outstanding_amount", 0)),
+                    "total_amount": flt(ref.get("total_amount", 0))
                 })
         
         for key, value in kwargs.items():
-            if hasattr(doc, key):
-                setattr(doc, key, value)
+            if hasattr(pe, key):
+                setattr(pe, key, value)
         
-        doc.insert()
-        doc.submit()
+        pe.setup_party_account_field()
+        pe.set_missing_values()
+        pe.set_amounts()
+        
+        pe.insert()
+        
+        pe.submit()
         
         return {
             "status": "success",
-            "message": _("Payment Entry created successfully"),
-            "name": doc.name
+            "message": _("Payment Entry {0} successfully").format("created and submitted" if submit else "created"),
+            "name": pe.name,
+            "docstatus": pe.docstatus
         }
+        
     except Exception as e:
+        frappe.log_error(frappe.get_traceback(), _("Payment Entry Creation Error"))
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@frappe.whitelist()
+def create_payment_entry_from_invoice(invoice_doctype, invoice_name, paid_amount=None, 
+                                     mode_of_payment=None, submit=False, **kwargs):
+    """
+    Create Payment Entry from an existing Sales Invoice or Purchase Invoice
+    using ERPNext's built-in get_payment_entry method
+    
+    Args:
+        invoice_doctype (str): "Sales Invoice" or "Purchase Invoice"
+        invoice_name (str): Name of the invoice
+        paid_amount (float, optional): Amount to pay (defaults to outstanding amount)
+        mode_of_payment (str, optional): Mode of payment
+        submit (bool, optional): Whether to submit the payment entry (default: False)
+        **kwargs: Additional fields to set on the payment entry
+    
+    Returns:
+        dict: Status and payment entry details
+    """
+    try:
+        from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry as erpnext_get_payment_entry
+        
+        # Validate invoice doctype
+        if invoice_doctype not in ["Sales Invoice", "Purchase Invoice"]:
+            frappe.throw(_("invoice_doctype must be 'Sales Invoice' or 'Purchase Invoice'"))
+        
+        # Check if invoice exists
+        if not frappe.db.exists(invoice_doctype, invoice_name):
+            frappe.throw(_("{0} {1} does not exist").format(invoice_doctype, invoice_name))
+        
+        # Use ERPNext's built-in method to create payment entry
+        pe = erpnext_get_payment_entry(
+            dt=invoice_doctype,
+            dn=invoice_name,
+            party_amount=paid_amount,
+            bank_account=None
+        )
+        
+        # Set mode of payment if provided
+        if mode_of_payment:
+            pe.mode_of_payment = mode_of_payment
+            
+            # Update bank account based on mode of payment
+            invoice_doc = frappe.get_doc(invoice_doctype, invoice_name)
+            bank_account = frappe.db.get_value(
+                "Mode of Payment Account",
+                {"parent": mode_of_payment, "company": invoice_doc.company},
+                "default_account"
+            )
+            if bank_account:
+                if pe.payment_type == "Receive":
+                    pe.paid_to = bank_account
+                    pe.paid_to_account_currency = frappe.db.get_value("Account", bank_account, "account_currency")
+                else:
+                    pe.paid_from = bank_account
+                    pe.paid_from_account_currency = frappe.db.get_value("Account", bank_account, "account_currency")
+        
+        # Set additional fields from kwargs
+        for key, value in kwargs.items():
+            if hasattr(pe, key):
+                setattr(pe, key, value)
+        
+        # Recalculate amounts if mode of payment changed
+        if mode_of_payment:
+            pe.set_amounts()
+        
+        # Insert the payment entry
+        pe.insert()
+        
+        # Submit if requested
+        if submit:
+            pe.submit()
+        
+        return {
+            "status": "success",
+            "message": _("Payment Entry {0} successfully from {1} {2}").format(
+                "created and submitted" if submit else "created",
+                invoice_doctype,
+                invoice_name
+            ),
+            "name": pe.name,
+            "docstatus": pe.docstatus,
+            "payment_type": pe.payment_type,
+            "paid_amount": pe.paid_amount,
+            "received_amount": pe.received_amount
+        }
+        
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), _("Payment Entry from Invoice Creation Error"))
         return {
             "status": "error",
             "message": str(e)
