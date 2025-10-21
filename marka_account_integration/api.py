@@ -635,7 +635,7 @@ def login_and_open_general_ledger(company=None, from_date=None, to_date=None, ac
     )
 
 @frappe.whitelist()
-def open_report(report_type, company=None, from_date=None, to_date=None, account=None, **kwargs):
+def open_report(report_type=None, company=None, from_date=None, to_date=None, account=None, **kwargs):
     """
     General endpoint to open any of the specified reports
     
@@ -658,6 +658,10 @@ def open_report(report_type, company=None, from_date=None, to_date=None, account
         **kwargs: Additional parameters for specific reports
     """
     try:
+        # Check if report_type is provided
+        if not report_type:
+            frappe.throw("Report type is required")
+        
         # Validate report type
         if report_type not in REPORT_MAPPING:
             available_reports = ", ".join(REPORT_MAPPING.keys())
@@ -710,9 +714,10 @@ def open_report(report_type, company=None, from_date=None, to_date=None, account
         if account:
             params.append(f"account={account}")
         
-        # Add any additional parameters
+        # Add any additional parameters (exclude cmd and sid as they shouldn't be passed to the report)
+        excluded_params = ['cmd', 'sid', 'report_type']
         for key, value in kwargs.items():
-            if value is not None:
+            if value is not None and key not in excluded_params:
                 params.append(f"{key}={value}")
         
         # Add session ID
