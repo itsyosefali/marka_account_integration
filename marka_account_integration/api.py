@@ -698,7 +698,7 @@ def open_report(report_type=None, company=None, from_date=None, to_date=None, ac
             report_url = f"{site_url}/app/query-report/{report_name.replace(' ', '%20')}"
         elif report_type in ["cash_flow", "payables", "receivables", "payables_summary", "receivables_summary", "vat_report"]:
             # Script reports
-            report_url = f"{site_url}/app/script-report/{report_name.replace(' ', '%20')}"
+            report_url = f"{site_url}/app/query-report/{report_name.replace(' ', '%20')}"
         else:
             # Default to query report
             report_url = f"{site_url}/app/query-report/{report_name.replace(' ', '%20')}"
