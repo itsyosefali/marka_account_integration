@@ -616,11 +616,11 @@ REPORT_MAPPING = {
     "cash_flow": "Cash Flow",
     "payables": "Accounts Payable",
     "receivables": "Accounts Receivable",
-    "payables_summary": "Payables Summary",
-    "receivables_summary": "Receivables Summary",
+    "payables_summary": "Accounts Payable Summary",
+    "receivables_summary": "Accounts Receivable Summary",
     "trial_balance": "Trial Balance",
     "balance_sheet": "Balance Sheet",
-    "vat_report": "VAT Report"
+    "vat_report": "UAE VAT 201"  # Changed from "VAT Report" to "VAT Audit Report" (standard ERPNext report)
 }
 
 @frappe.whitelist()
@@ -650,7 +650,7 @@ def open_report(report_type=None, company=None, from_date=None, to_date=None, ac
             - receivables_summary: Report Receivables Summary
             - trial_balance: Trial Balance
             - balance_sheet: Balance Sheet
-            - vat_report: VAT Report
+            - vat_report: UAE VAT 201
         company (str, optional): Company filter
         from_date (str, optional): From date filter
         to_date (str, optional): To date filter
@@ -986,12 +986,12 @@ def get_available_reports():
             },
             {
                 "type": "payables_summary",
-                "name": "Payables Summary",
+                "name": "Accounts Payable Summary",
                 "description": "Summary report of all payables"
             },
             {
                 "type": "receivables_summary", 
-                "name": "Receivables Summary",
+                "name": "Accounts Receivable Summary",
                 "description": "Summary report of all receivables"
             },
             {
@@ -1006,8 +1006,8 @@ def get_available_reports():
             },
             {
                 "type": "vat_report",
-                "name": "VAT Report",
-                "description": "VAT report for tax compliance"
+                "name": "UAE VAT 201",
+                "description": "UAE VAT 201 report for tax compliance"
             }
         ]
     }
