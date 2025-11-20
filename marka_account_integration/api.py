@@ -47,7 +47,7 @@ def create_item_if_not_exists(item_code, item_name=None, item_group="All Item Gr
 
 # Sales Invoice CRUD
 @frappe.whitelist()
-def create_sales_invoice(customer, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, **kwargs):
+def create_sales_invoice(customer, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, calculate_vat=True, **kwargs):
     """Create a new Sales Invoice"""
     try:
         customer = create_customer_if_not_exists(customer)
@@ -71,7 +71,7 @@ def create_sales_invoice(customer, items, posting_date=None, due_date=None, vat_
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
         
-        if vat_rate is not None:
+        if calculate_vat and vat_rate is not None:
             doc.append("taxes", {
                 "charge_type": "On Net Total",
                 "account_head": vat_account_head or "VAT 5% - M",
@@ -164,7 +164,7 @@ def delete_sales_invoice(name):
 
 # Purchase Invoice CRUD
 @frappe.whitelist()
-def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, **kwargs):
+def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, vat_rate=None, vat_account_head=None, vat_description=None, calculate_vat=True, **kwargs):
     """Create a new Purchase Invoice"""
     try:
         supplier = create_supplier_if_not_exists(supplier)
@@ -188,8 +188,8 @@ def create_purchase_invoice(supplier, items, posting_date=None, due_date=None, v
                 "amount": flt(item.get("qty", 1)) * flt(item.get("rate", 0))
             })
         
-        # Add VAT if provided
-        if vat_rate is not None:
+        # Add VAT if calculate_vat is True and vat_rate is provided
+        if calculate_vat and vat_rate is not None:
             doc.append("taxes", {
                 "charge_type": "On Net Total",
                 "account_head": vat_account_head or "VAT - UAE",
